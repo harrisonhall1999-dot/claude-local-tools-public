@@ -3,6 +3,74 @@
 Tools on this Mac that make Claude cheaper, faster or more private. They do heavy or bulk work locally,
 so Claude spends its context on judgment instead of raw reading.
 
+## Easiest: let Claude Code install it for you
+
+If you use Claude Code, you can hand it the whole setup (or just the pieces you pick) with one prompt. It follows this README, asks what you want,
+shows a plan before changing anything, checks each step, and stops instead of guessing when something fails.
+
+**Do these by hand first** (they need your password or a window):
+1. Install Apple's command-line tools and Homebrew: `xcode-select --install`, then the Homebrew installer from https://brew.sh.
+2. Install Claude Code and sign in (see Anthropic's Claude Code docs).
+3. Clone this repo and open it in Claude Code with the recommended settings:
+```bash
+git clone https://github.com/harrisonhall1999-dot/claude-local-tools-public.git ~/Documents/claude-local-tools
+cd ~/Documents/claude-local-tools
+claude --model sonnet --effort medium --permission-mode manual
+```
+
+**Recommended settings, and why**
+| Setting | Use | Why |
+|---|---|---|
+| Model | `sonnet` | Installing is mostly running listed commands and checking results; Sonnet is fast, and it costs about a fifth of the top-tier model (Fable 5.1 is priced at 5x Sonnet and adds nothing for installs). |
+| Effort | `medium` | Enough to follow the checklist and read errors. Raise it only to debug a failure. |
+| Permission mode | `manual` | Claude asks before each command, so nothing runs that you haven't seen. Never use `bypassPermissions` or `--dangerously-skip-permissions` for an install: it changes your system. When it asks about a harmless read-only command (like `df -h /` or `scripts/memcheck`) you can allow it for the session. |
+| If something breaks | `claude --continue --model opus --effort high` | Resumes the same conversation with a stronger model for diagnosis. Switch back to Sonnet afterwards. |
+| Before you start | Quit Chrome, Teams and Outlook | The install downloads a lot and the local model needs RAM. A Mac with 16 GB can freeze under load. |
+
+**Paste this prompt** (edit the first line if you already know what you want, for example "Install only the core tools and the school group"):
+
+```text
+Set up Claude Local Tools on this Mac, from this repo folder. Install what I choose, nothing else. Follow these rules exactly.
+
+SOURCE OF TRUTH
+Read README.md ("Start here") and docs/dev-stack.md first. Use only the commands and scripts they name. Do not add installs, tweaks or "improvements".
+
+STEP 0 - PREFLIGHT (read-only)
+Run: sw_vers; uname -m; df -h /; memory_pressure | head -3; command -v brew uv ollama claude. Report it in five lines.
+Stop and tell me if: the Mac is not Apple Silicon, free disk is under 15 GB, or Homebrew is missing (print the install command; do not run it).
+
+STEP 1 - ASK WHAT I WANT, then wait for my answer (default A)
+A. Core tools: OCR, local model offload, search, file conversion, study cards (README steps 4-8; about 12 GB).
+B. School & law group (needs A): Canvas, Outlook, citation checker (python3 install.py --school).
+C. Gemini connector (needs A): cloud Gemini through the Antigravity CLI; needs my own Google AI plan.
+D. Developer stack, all or pieces (needs only Homebrew): D1 token savers (rtk, Headroom); D2 headless browsing (browser39, chrome-devtools, Playwright); D3 reverse engineering (REA + Ghidra); D4 linters; D5 mitmproxy.
+For each choice tell me the disk it needs and whether it is already installed (check with command -v and brew list; skip what exists).
+
+STEP 2 - PLAN
+Before changing anything, print the exact commands in order with download sizes and wait for me to say "go". For D, run scripts/setup-dev-stack.sh --dry-run and show the output first.
+
+SAFETY RULES
+- Never run sudo and never ask for my password. When a step needs sudo (README step 10: Java link for Ghidra), print the command and wait until I say I ran it.
+- Run only the steps I chose. Never run brew upgrade or brew uninstall, never pip install outside .venv, never npm install -g anything the README does not name.
+- Before editing any config (~/.claude/settings.json, ~/.claude.json, the Claude Desktop config, ~/.zprofile), copy it to <name>.bak-<timestamp>, then edit in place.
+- Symlinks: run ls -l first. Never mv or overwrite ~/.claude/CLAUDE.md or any symlink. install.py links ~/.claude/CLAUDE.md only if I have none; if I already have one, leave mine and tell me.
+- One heavy job at a time (brew bundle, pip install, model download). Run scripts/memcheck before each: RED means stop; YELLOW means tell me to close Chrome, Teams and Outlook first.
+- Never ask for, read or store passwords, tokens or API keys. I do every sign-in myself (Claude, agy, canvas-auth).
+- Do not create repos, push to GitHub or publish anything.
+- If a step fails: stop, show the last 20 lines of the error, say what you think happened, propose ONE fix, and retry at most once. Do not skip a check to keep going.
+
+AFTER EACH STEP
+Run that step's "Check" from the README and report PASS or FAIL in one line before moving on.
+
+FINISH
+Run .venv/bin/python scripts/check.py (prefix CLT_SCHOOL=1 if I chose B) and, if I chose D, scripts/verify-dev-stack.sh. Then tell me in plain words: what is installed, what failed, and what I still must do by hand (fully quit and reopen Claude Desktop with Cmd+Q; any sudo step; the Local Network permission; sign-ins; for D3, the Claude Desktop REA refresh). Start a new Claude Code session afterwards, because MCP servers load only at session start. Finally list how to undo each piece I installed.
+```
+
+**À la carte tips**
+- You can re-run the prompt any time to add pieces later; it skips what is already installed.
+- If you only want one tool, say so on the first line (for example "Only install the Gemini connector"); Claude will still do the core steps it depends on.
+- Everything except the core is optional, and nothing here touches your accounts, your files or your existing Claude settings without a backup first.
+
 ## Start here: set everything up, in order
 
 This is the whole path from a fresh Mac to every tool in this repo. Do the steps in order; each one ends with a check so you know it worked.
