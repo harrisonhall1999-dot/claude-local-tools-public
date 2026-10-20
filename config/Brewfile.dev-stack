@@ -1,0 +1,38 @@
+# Optional developer extras: token savers, headless tools, reverse engineering, linters.
+# Install: scripts/setup-dev-stack.sh (it runs this file first), or brew bundle --file config/Brewfile.dev-stack
+tap "rtk-ai/tap"
+
+brew "node"
+brew "uv"
+brew "pipx"
+brew "gh"
+brew "nmap"
+brew "wireshark"          # provides tshark
+brew "openjdk@21"         # Ghidra needs a linked JDK 21 (see docs/dev-stack.md)
+brew "cmake"
+brew "pkg-config"
+brew "go"
+
+# Token economy and headless tools
+brew "rtk-ai/tap/rtk"
+brew "ast-grep"
+brew "ripgrep"
+brew "duckdb"
+brew "repomix"
+brew "pdfcpu"
+
+# Reverse engineering
+brew "ghidra"
+brew "radare2"
+
+# Free linters and build-output filters
+brew "actionlint"
+brew "shellcheck"
+brew "ruff"
+brew "yamllint"
+brew "xcbeautify"
+brew "swiftlint"
+brew "difftastic"
+
+cask "mitmproxy"
+cask "hopper-disassembler"   # free demo; Ghidra covers everything REA needs

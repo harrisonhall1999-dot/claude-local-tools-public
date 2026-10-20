@@ -1,0 +1,20 @@
+#!/bin/bash
+# One-command Mac health check: disk, RAM pressure, swap, local models loaded, biggest apps. Prints GREEN / YELLOW / RED.
+free_gb=$(df -g / | awk 'NR==2{print $4}')
+free_pct=$(memory_pressure 2>/dev/null | awk -F': ' '/free percentage/{gsub("%","",$2);print $2}')
+swap_mb=$(sysctl -n vm.swapusage | awk '{gsub("M","",$6);printf "%d",$6}')
+echo "Disk free:        ${free_gb} GB"
+echo "Memory free:      ${free_pct}%   (macOS wants this above ~25%)"
+echo "Swap in use:      ${swap_mb} MB"
+echo "Local AI models loaded:"; ollama ps 2>/dev/null | tail -n +2 | sed 's/^/   /'; [ -z "$(ollama ps 2>/dev/null | tail -n +2)" ] && echo "   none"
+echo "Biggest memory users:"
+ps -axo rss,comm | awk '{r=$1/1024;$1="";n=$0;sub(/.*\//,"",n);sub(/ Helper.*/,"",n);a[n]+=r} END{for(k in a) printf "%6.0f MB  %s\n",a[k],k}' | sort -rn | head -6 | sed 's/^/   /'
+v=GREEN
+{ [ "$free_gb" -lt 5 ] || [ "${free_pct:-100}" -lt 40 ] || [ "$swap_mb" -gt 3000 ]; } && v=YELLOW
+{ [ "$free_gb" -lt 3 ] || [ "${free_pct:-100}" -lt 20 ]; } && v=RED
+echo; echo "VERDICT: $v"
+case $v in
+ GREEN)  echo "Safe to start a build, Ghidra analysis or local-model batch.";;
+ YELLOW) echo "OK for ONE heavy job. Quit Chrome (or most tabs), Teams and Outlook first. Never run two heavy jobs at once.";;
+ RED)    echo "Do NOT start heavy work. Quit Chrome, Teams, Outlook; free disk space; run memcheck again.";;
+esac

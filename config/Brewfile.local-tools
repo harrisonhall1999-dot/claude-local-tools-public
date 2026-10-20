@@ -1,0 +1,13 @@
+# System packages for the core local tools (servers/*). Install: brew bundle --file config/Brewfile.local-tools
+brew "uv"                  # creates the Python 3.13 environment
+brew "pandoc"              # document conversion
+brew "imagemagick"         # image conversion
+brew "ocrmypdf"            # searchable-PDF layer (pulls in tesseract and ghostscript)
+brew "tesseract"
+brew "qpdf"
+brew "poppler"
+brew "ffmpeg"              # decodes audio for transcription
+brew "yt-dlp"              # video/audio downloads (fetch_media)
+brew "gallery-dl"          # image/gallery downloads (fetch_media)
+cask "ollama-app"          # runs the local model
+cask "antigravity-cli"     # OPTIONAL: provides `agy`, only needed for the gemini tool
