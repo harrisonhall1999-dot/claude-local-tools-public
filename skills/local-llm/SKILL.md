@@ -5,10 +5,16 @@ description: Offload bulk, mechanical text work (summarizing, extracting, classi
 
 # Local LLM offloading
 
-A local model (Ollama, `gemma4:12b` by default, the largest that fits this Mac's 16 GB of RAM) runs
-on this Mac. It costs no Claude usage, but it is a small model: it's slow (about 20s to load, then about 5-60s per call) and makes mistakes
-(miscounts, adds unsupported details). Use it to **save Claude context on bulk reading**, not to
-replace Claude's judgment.
+Free models do the bulk reading. `local_llm` tries the Ollama cloud model `cloud-offload` first
+(about 1-5s per call, no local RAM; the text leaves the Mac). When the cloud errors or its free limit is hit, DeepSeek's API takes over (also cloud, no
+local RAM; runs on a one-time sign-up credit, then the user's prepaid balance, and is skipped when the
+balance is empty). After that, Apple's on-device model `apple-fm` (the
+`fm` command built into macOS 27, about 1-7s per call, ~200 MB of RAM, ~30k characters per piece)
+takes over, and the local `qwen-offload` (abliterated Qwen3.5 9B, about 20s to load, then 5-60s per
+call) runs only if Apple's model refuses or is unavailable. The result footer names the model that
+answered. They are small models and make mistakes (miscounts, adds unsupported details; `apple-fm`
+is weak at arithmetic and once labelled "granted in part" as "denied in part"). Use them to **save
+Claude context on bulk reading**, not to replace Claude's judgment.
 
 ## When to offload
 
@@ -23,12 +29,15 @@ Offload only when **all** of these hold:
 
 Never offload: legal analysis or conclusions, final drafts the user will submit or send, citation or
 Bluebook work, anything where an error would hurt and you can't verify it, or tasks where the user
-asked for Claude specifically. Confidential material is fine (and a good fit), because nothing
-leaves the machine.
+asked for Claude specifically. The first tiers are cloud models, so for confidential material pass `model="apple-fm"` or
+`model="qwen-offload"` (nothing leaves the Mac) unless the user has said cloud offload is fine. To keep
+every call local, set `LOCAL_LLM_FREE_MODEL`, `LOCAL_LLM_CLOUD_MODEL` and `LOCAL_LLM_DEEPSEEK_MODEL` to empty.
 
 ## Give a heads-up first (not a gate)
-The model takes ~8 GB of this Mac's 16 GB of RAM. When Teams, Outlook and Chrome are open, that has
-frozen the machine. Right before each offload, tell the user in one or two lines:
+Call `local_llm_status` first (instant, loads nothing). Only if it says LOCAL (cloud paused and
+Apple's model unavailable, or you chose `model="qwen-offload"`) is the heads-up needed:
+`qwen-offload` takes ~6 GB of this Mac's 16 GB of RAM, and with Teams, Outlook and Chrome open that
+has frozen the machine. `apple-fm` is light and needs no heads-up. Right before such an offload, tell the user in one or two lines:
 - what you're sending (how many files and roughly how many pages or words) and a rough time estimate
   (about 20s to load, plus about 5-60s per file or chunk)
 - a reminder to close Teams, Outlook and extra Chrome tabs if they can, since the Mac may slow down

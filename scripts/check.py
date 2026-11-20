@@ -17,7 +17,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from install import DESKTOP_CONFIG, PYTHON, SERVERS  # noqa: E402
+from install import DESKTOP_CONFIG, PYTHON, SERVERS, SHARED, hub_port  # noqa: E402
 
 
 async def check(name, script):
@@ -27,6 +27,32 @@ async def check(name, script):
             await s.initialize()
             tools = [t.name for t in (await s.list_tools()).tools]
             print(f"ok    {name}: {', '.join(tools)}")
+
+
+async def check_hub():
+    """True if every shared server answers over HTTP with the same tools as its script (skipped if SHARED is off)."""
+    if not SHARED:
+        return True
+    from mcp.client.streamable_http import streamable_http_client
+
+    async def one(name):
+        async with streamable_http_client(f"http://127.0.0.1:{hub_port(name)}/mcp") as (r, w, *_):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                return len((await s.list_tools()).tools)
+
+    down = []
+    for name in SERVERS:
+        try:
+            await asyncio.wait_for(one(name), timeout=10)
+        except Exception:
+            down.append(name)
+    if down:
+        print(f"FAIL  shared servers down: {', '.join(down)} (mcp-hub status; logs/mcp-hub/<name>.log; "
+              "launchctl kickstart -k gui/$(id -u)/com.claude-local-tools.mcp-hub)")
+        return False
+    print(f"ok    shared servers ({len(SERVERS)} on 127.0.0.1)")
+    return True
 
 
 def check_desktop():
@@ -83,6 +109,8 @@ async def main():
         except Exception as e:
             failed = True
             print(f"FAIL  {name}: {e!r}")
+    if not await check_hub():
+        failed = True
     if not check_desktop():
         failed = True
     if not check_skills():

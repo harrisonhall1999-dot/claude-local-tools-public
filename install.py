@@ -31,10 +31,24 @@ SERVERS = {
     "outlook": "servers/outlook/server.py",
     "canvas": "servers/canvas/server.py",
 }
+_PORT_ORDER = list(SERVERS)  # fixed before the optional groups are dropped, so ports never shift
+
+# Shared servers (scripts/mcp_hub.py): Claude Code connects to one copy of each server over HTTP
+# instead of starting its own copies per session. False = every session starts its own (stdio).
+SHARED = True
+HUB_PORT = 8770
+
+
+def hub_port(name):
+    """Port of a server in the hub: HUB_PORT + its position in SERVERS (so add new servers at the end)."""
+    return HUB_PORT + _PORT_ORDER.index(name)
+
 
 # Commands put on PATH: name -> Python CLI script (run with the shared venv).
 COMMANDS = {
+    "mcp-hub": "scripts/mcp_hub.py",
     "local-llm": "servers/local-llm/cli.py",
+    "setup-keys": "scripts/setup_keys.py",
     "ocr": "servers/ocr/cli.py",
     "read-document": "servers/ocr/read_document_cli.py",
     "fetch-url": "servers/ocr/fetch_url_cli.py",
@@ -46,6 +60,7 @@ COMMANDS = {
     "outlook": "servers/outlook/cli.py",
     "canvas": "servers/canvas/cli.py",
     "canvas-auth": "servers/canvas/auth_cli.py",
+    "localtools": "localtools/cli.py",
 }
 
 # Optional "school & law" group: installed only with `python3 install.py --school` (or CLT_SCHOOL=1).
@@ -96,14 +111,31 @@ def write_launcher(name, script):
 
 
 def register_claude_code():
-    print("Claude Code (user scope):")
+    hub = os.path.join(ROOT, "scripts", "mcp_hub.py")
+    if SHARED:
+        print("Shared servers (launchd):")
+        subprocess.run([PYTHON, hub, "install"], check=True,
+                       env={**os.environ, "CLT_SCHOOL": "1" if SCHOOL else "0"})
+    else:
+        subprocess.run([PYTHON, hub, "uninstall"], capture_output=True)
+    print(f"Claude Code (user scope, {'shared over HTTP' if SHARED else 'one copy per session'}):")
     for name, script in SERVERS.items():
         subprocess.run(["claude", "mcp", "remove", name, "-s", "user"],
                        capture_output=True)
-        subprocess.run(["claude", "mcp", "add", "-s", "user", name, "--",
-                        PYTHON, os.path.join(ROOT, script)],
-                       check=True, capture_output=True)
+        how = (["--transport", "http", name, f"http://127.0.0.1:{hub_port(name)}/mcp"] if SHARED
+               else [name, "--", PYTHON, os.path.join(ROOT, script)])
+        subprocess.run(["claude", "mcp", "add", "-s", "user", *how], check=True, capture_output=True)
         print(f"  {name}")
+
+
+def prune_backups(keep=3):
+    """Keep only the newest `keep` Desktop config backups (they hold any tokens the config holds)."""
+    folder, base = os.path.split(DESKTOP_CONFIG)
+    old = sorted(f for f in os.listdir(folder) if f.startswith(base + ".bak-"))
+    for f in old[:-keep]:
+        os.remove(os.path.join(folder, f))
+    if len(old) > keep:
+        print(f"  removed {len(old) - keep} old config backups (kept {keep})")
 
 
 def register_desktop():
@@ -112,7 +144,9 @@ def register_desktop():
     if os.path.exists(DESKTOP_CONFIG):
         backup = f"{DESKTOP_CONFIG}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
         shutil.copy2(DESKTOP_CONFIG, backup)
+        os.chmod(backup, 0o600)
         print(f"  backed up config to {os.path.basename(backup)}")
+        prune_backups(keep=3)
         with open(DESKTOP_CONFIG) as f:
             cfg = json.load(f)
     servers = cfg.setdefault("mcpServers", {})
@@ -136,6 +170,11 @@ def main():
             continue
         if os.path.isfile(os.path.join(ROOT, "skills", name, "SKILL.md")):
             link(os.path.join(ROOT, "skills", name), os.path.join(HOME, ".claude", "skills", name))
+    print("Hooks (config/hooks -> ~/.claude/hooks; enable each in ~/.claude/settings.json):")
+    hooks_dir = os.path.join(ROOT, "config", "hooks")
+    for name in sorted(os.listdir(hooks_dir)) if os.path.isdir(hooks_dir) else []:
+        if name.endswith((".sh", ".py")):
+            link(os.path.join(hooks_dir, name), os.path.join(HOME, ".claude", "hooks", name))
     print("Global instructions:")
     link(os.path.join(ROOT, "config", "global-CLAUDE.md"), os.path.join(HOME, ".claude", "CLAUDE.md"))
     print("Commands:")

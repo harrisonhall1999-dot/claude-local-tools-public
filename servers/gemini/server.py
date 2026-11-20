@@ -28,12 +28,12 @@ def gemini(
 ) -> str:
     """Run a task on Gemini (cloud, via the Antigravity CLI) and return its answer.
 
-    PRIVACY: the input is sent to Google and may be used for training. Use
-    ONLY for public material: cases, statutes, regulations, assigned
-    readings, published articles, web pages. NEVER send confidential or
-    client material, unpublished drafts (e.g. the user's journal note),
-    personal data, or anything the user called private; use `local_llm`
-    for those. If unsure, ask the user first.
+    PRIVACY: the input is sent to Google and may be used for training. By
+    default use it for public material: cases, statutes, regulations,
+    readings, published articles, web pages. Send confidential, client or
+    unpublished material, or personal data, only if the user has said that
+    cloud offload is fine for it (e.g. in their CLAUDE.md); otherwise use
+    `local_llm`. If unsure, ask the user first.
 
     Use for bulk, mechanical reading of long public text that you would
     otherwise read yourself: summarizing, extracting holdings/rules/quotes/
@@ -76,8 +76,8 @@ def gemini_batch(
 ) -> str:
     """Apply the same instruction to each file separately on Gemini (cloud).
 
-    Same PRIVACY rule as `gemini`: public material only, never confidential,
-    client or unpublished work (use `local_llm_batch` for those).
+    Same PRIVACY rule as `gemini`: public material by default; private work
+    only if the user has said cloud offload is fine (else `local_llm_batch`).
 
     Use for per-document jobs over many public files, e.g. "brief each
     assigned case" or "summarize each reading". With output_dir set, each
@@ -117,7 +117,7 @@ def gemini_search(
     terms-and-connectors (/s, /p, pre/n, ATLEAST, SY(), DI()) do NOT work on
     the web; give the user those queries to run in Lexis/Westlaw instead.
 
-    The query goes to Google, so keep confidential client facts out of it.
+    The query goes to Google, so keep confidential facts out of it.
     Results are unverified: its "quotes" are sometimes paraphrased or
     misattributed and dates are often missing. Never quote from it; open the
     source (fetch_url) first, and tell the user the results came from Gemini. ~15-60s.

@@ -35,7 +35,7 @@ def _key(password: bytes | None = None) -> bytes:
                            capture_output=True, text=True, timeout=120)
         if p.returncode != 0:
             raise ChromeCookieError("macOS didn't release Chrome's cookie key (Keychain prompt denied "
-                                    "or Chrome not installed). Run `canvas-auth --chrome` and choose Always Allow.")
+                                    "or Chrome not installed). Run the tool again and choose Always Allow.")
         password = p.stdout.strip().encode()
     k = hashlib.pbkdf2_hmac("sha1", password, b"saltysalt", 1003, 16)
     _key_cache["k"] = k
@@ -67,13 +67,14 @@ def _matches(host: str, host_key: str) -> bool:
 SESSION_NAMES = ("canvas_session", "_legacy_normandy_session", "_normandy_session")
 
 
-def _signed_in(jar: dict) -> bool:
-    return any(n in jar for n in SESSION_NAMES)
+def _signed_in(jar: dict, names: tuple = SESSION_NAMES) -> bool:
+    return any(n in jar for n in names)
 
 
-def read(host: str, profile: str = "", cookies_db: str = "", password: bytes | None = None) -> dict[str, str]:
+def read(host: str, profile: str = "", cookies_db: str = "", password: bytes | None = None,
+         session_names: tuple = SESSION_NAMES) -> dict[str, str]:
     """{name: value} of unexpired cookies Chrome would send to https://host/. Without a profile,
-    uses the first Chrome profile that holds a Canvas session cookie."""
+    uses the first Chrome profile that holds one of session_names (default: Canvas's)."""
     host = host.lower().split(":")[0]
     dbs = [cookies_db] if cookies_db else [os.path.join(CHROME_DIR, p, "Cookies") for p in ([profile] if profile else profiles())]
     best: dict[str, str] = {}
@@ -108,11 +109,11 @@ def read(host: str, profile: str = "", cookies_db: str = "", password: bytes | N
             con.close()
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
-        if _signed_in(jar) or (jar and not best):
+        if _signed_in(jar, session_names) or (jar and not best):
             best, best_profile = jar, os.path.basename(os.path.dirname(path))
-            if _signed_in(jar):
+            if _signed_in(jar, session_names):
                 break
-    if not _signed_in(best):
+    if not _signed_in(best, session_names):
         raise ChromeCookieError(f"Chrome isn't signed in to {host}. Open https://{host} in Chrome, sign in, then retry.")
     best_profile_holder[0] = best_profile
     return best

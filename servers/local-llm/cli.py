@@ -18,8 +18,11 @@ import core
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="local-llm",
-        description="Run an instruction on the local Ollama model over text or files.",
+        description="Run an instruction on a free model over text or files (cloud, then Apple on-device apple-fm, then local qwen-offload).",
     )
+    if sys.argv[1:] == ["--status"]:
+        print(core.status())
+        return
     parser.add_argument("instruction")
     parser.add_argument("paths", nargs="*", help="Files or globs")
     parser.add_argument("--batch", action="store_true",

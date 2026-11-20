@@ -78,7 +78,7 @@ Steps 1-8 give you the core tools. Steps 9-10 are optional add-ons. Step 11 is t
 
 **What you need**
 - An Apple Silicon Mac (M1 or newer) on a recent macOS. **16 GB of RAM is the practical minimum** for the local model.
-- About **12 GB free disk** for the core (measured: Python packages 2.3 GB, local model 7.5 GB, speech models 1.6 GB). The dev stack adds more; Xcode, if you want it, is separate and large. Check with `df -h /`.
+- About **12 GB free disk** for the core (measured: Python packages 2.3 GB, local model about 6 GB, speech models 1.6 GB). The dev stack adds more; Xcode, if you want it, is separate and large. Check with `df -h /`.
 - Claude Desktop and/or Claude Code, signed in. You'll need your Mac password for a few steps.
 - Optional accounts: a Google AI plan (only for the `gemini` tool), your school's Canvas and classic Outlook (only for the school group).
 
@@ -112,14 +112,17 @@ uv pip install --python .venv/bin/python -r requirements.txt
 ```
 Check: `.venv/bin/python -c "import mcp; print('ok')"`.
 
-**6. Download and build the local models** (about 7.5 GB; this is the slow step)
+**6. Download and build the local models** (about 6 GB; this is the slow step)
 ```bash
-ollama pull gemma4:12b
+ollama pull sachasayan/interimlabs-huihui-qwen3.5-9b-abliterated:q4_k_m
 ollama pull nomic-embed-text
-ollama create gemma4-offload -f models/offload.Modelfile
-ollama create gemma4-direct -f models/direct.Modelfile
+ollama create qwen-offload -f models/qwen-offload.Modelfile
+ollama signin                                                   # free ollama.com account, for the cloud model
+ollama create cloud-offload -f models/cloud-offload.Modelfile    # skip if you want nothing to leave the Mac
 ```
-Check: `ollama list` shows all four. The speech models (about 1.6 GB) and speaker models (about 50 MB) download by themselves the first time you transcribe something.
+Check: `ollama list` shows `qwen-offload`, `nomic-embed-text` and (if you made it) `cloud-offload`.
+Optional chat model: `ollama pull gemma4:12b && ollama create gemma4-direct -f models/direct.Modelfile` (7.5 GB more).
+Optional free cloud keys for `local-llm` (FreeLLMAPI router; DeepSeek is paid and off unless you add a key): `setup-keys`. The speech models (about 1.6 GB) and speaker models (about 50 MB) download by themselves the first time you transcribe something.
 
 **7. Connect everything to Claude**
 ```bash
@@ -165,14 +168,14 @@ It installs the packages in `config/Brewfile.dev-stack`, registers the MCP serve
 | Command not found (`ocr`, `to-md`) | Add `~/.local/bin` to PATH (step 7), open a new Terminal. |
 | `install.py` says "skip ... a real file is there" | That path already holds your own file. Move it aside and re-run. |
 | Mac is slow or frozen during a job | Quit big apps, run `memcheck`, and run one heavy job at a time. |
-| Out of disk | `df -h /`; the model (7.5 GB) and Python packages (2.3 GB) are the big pieces. |
+| Out of disk | `df -h /`; the model (about 6 GB) and Python packages (2.3 GB) are the big pieces. |
 
 ## What's here
 
 | Tool | Kind | What it does for Claude |
 |---|---|---|
 | `ocr` | MCP server + `ocr`, `read-document`, `fetch-url`, `transcribe` commands + `transcribe` skill | Pulls text from PDFs, images (OCR), Word/PowerPoint/Excel files and web pages on this Mac, instead of spending vision tokens or a web fetch. Transcribes audio/video with Whisper large-v3-turbo into a timestamped transcript with speakers labelled (sherpa-onnx diarization), after asking for speaker count, names and key terms; names speakers with `rename_speakers`; offline, ~2-3 GB of RAM while running, can save long transcripts to a file. |
-| `local-llm` | MCP server + `local-llm` command + skill | Hands bulk, mechanical reading (summaries, extraction, sorting) to the local Ollama model (`gemma4-offload`), so long documents never enter Claude's context. |
+| `local-llm` | MCP server + `local-llm` command + skill | Hands bulk, mechanical reading (summaries, extraction, sorting) to a free model, so long documents never enter Claude's context. It tries free cloud models first (FreeLLMAPI if you set it up, the Ollama cloud model `cloud-offload`, DeepSeek only if you add a key), then Apple's on-device model (`apple-fm`, macOS 27's `fm` command, ~200 MB RAM), then the local `qwen-offload` (~6 GB RAM). The cloud tiers send text off the Mac: for confidential material Claude passes `model="apple-fm"` or `"qwen-offload"`, and setting `LOCAL_LLM_FREE_MODEL`, `LOCAL_LLM_CLOUD_MODEL` and `LOCAL_LLM_DEEPSEEK_MODEL` to empty keeps every call local. `local_llm_status` says which tier will answer. |
 | `search` | MCP server (`index_docs`, `search_docs`) + `index-docs` command | Local hybrid search over your documents. Embeds a folder (Ollama `nomic-embed-text`) into a SQLite index with an FTS5 keyword index alongside, then ranks each query both by meaning and by exact words (BM25), fused with Reciprocal Rank Fusion. Exact section cites, case names and docket numbers that embeddings blur still come up, and Claude fetches what matters instead of reading whole folders. Falls back to keyword-only if Ollama is down. Indexing skips OCR (run `pdf_ocr` on scanned PDFs first). |
 | `files` | MCP server (`convert`, `pdf_ocr`, `pdf_tool`, `to_markdown`, `fetch_media`) + `fetch-media` command | Local file/media utilities wrapping pandoc, ImageMagick, ocrmypdf, PyMuPDF, yt-dlp and gallery-dl: convert documents between Markdown/Word/HTML/PDF and images between HEIC/PNG/JPG/WebP/AVIF/SVG and more (a folder at a time, with resizing, or photos into one PDF), add a searchable text layer to scanned PDFs, split/merge/extract PDF pages, and download whatever is behind a link. `fetch_media` routes the URL itself: direct files are downloaded as-is, video/audio pages go to yt-dlp (~1,800 sites, playlists, resolution cap), image posts and galleries to gallery-dl. It can also save just the captions as a timestamped transcript (no Whisper), describe a link without downloading (each resolution with an estimated size), and use a logged-in browser session for login-walled media. Run in a terminal, `fetch-media` shows a menu of resolutions with sizes, audio (m4a or mp3) and captions, shows live progress, uses the copied link when run with no URL, and removes half-written files on Ctrl-C; `-y` or any `--kind` skips the menu. |
 | `to_markdown` | `files` server tool + `to-md` command | Turns PDFs, Word/PowerPoint/Excel, EPUB, HTML and web pages into Markdown files on disk, keeping what legal accuracy depends on: headings, (a)/(1)/(A) paragraph markers, block quotes, italics, tables, Word footnotes, star paging, and `<!-- page N -->` markers for PDF pin cites. Each file gets a fidelity score (the share of the source's words that made it into the Markdown, checked against an independent text read), so a dropped passage shows up as a number. Text stays out of Claude's context; batches take folders and globs. Uses pandoc, pymupdf4llm, and curl_cffi to get past basic bot blocks. |
@@ -182,7 +185,10 @@ It installs the packages in `config/Brewfile.dev-stack`, registers the MCP serve
 | `canvas` | MCP server (`canvas_due`, `canvas_announcements`, `canvas_grades`, `canvas_course`, `canvas_read`, `canvas_files`, `canvas_sync`, `canvas_changes`, `canvas_status`, `canvas_api`) + `canvas` and `canvas-auth` commands + skill | Read-only Canvas LMS with your own sign-in (your Canvas session in Chrome, read fresh each run, for schools that block student tokens; or a personal access token): what's due across courses with submission status and missing work, announcements, grades per assignment group, module outlines, and any syllabus/page/assignment/discussion/quiz/file by URL or title as Markdown. `canvas_sync` mirrors each current course to `~/Documents/Canvas/<course>/` (Markdown + downloaded files, incl. files linked from pages) and logs changes between syncs (new announcements, due-date changes, grades posted, new files); `canvas schedule on` syncs every 4 h via launchd. Canvas text is fenced as untrusted data. Ideas from vishalsachdev/canvas-mcp and DMontgomery40/mcp-canvas-lms; no code copied. |
 | `outlook` | MCP server (`ol_briefing`, `ol_search`, `ol_read`, `ol_thread`, `ol_attachments`, `ol_calendar`, `ol_free`, `ol_changes`, `ol_sync`) + `outlook` command | Read-only school mail and calendar from classic Outlook for Mac, for when the Microsoft 365 connector is blocked. Mail search reads Outlook's own database (read-only, works with Outlook closed); full messages, attachments and calendar details come over AppleScript. Calendar syncs expand recurring series (shared calendars included) into a local store and log added/moved/cancelled events. `outlook schedule on` syncs every 30 min via launchd and writes a daily Markdown briefing (events, changes, unread Focused mail, flagged). Store and briefings in `~/Library/Application Support/claude-local-tools/outlook/` (owner-only). Cannot send, move or delete. |
 
-All are available in Claude Code and in the Claude Desktop app.
+| `localtools` | Python package + `localtools` command + skill | "Code execution with MCP": every tool above as a Python function, so Claude can chain several tools, loop over many items or filter big output in one script and print only the result, instead of a round trip per call. `localtools tools <words>` finds tools without loading every definition; reusable scripts go in `localtools/recipes/`. Claude Code only. |
+| shared servers | `scripts/mcp_hub.py` + `mcp-hub` command | Without it, every Claude Code session starts its own copy of every server (one Python process per server per session). With it (the default), launchd runs one copy of each on `127.0.0.1:8770+` and Claude Code connects by URL, so ten open sessions cost the same as one. A server that grows past 600 MB (a loaded OCR or Whisper model) restarts itself after 2 idle minutes. `mcp-hub status` shows memory per server; logs in `logs/mcp-hub/`. Claude Desktop still starts its own copies (its config takes only local commands). To turn it off, set `SHARED = False` in `install.py` and re-run it. |
+
+All are available in Claude Code and in the Claude Desktop app (except `localtools`, which needs Claude Code).
 
 The **school & law group** (`canvas`, `outlook`, `cite`) installs only with `python3 install.py --school`; everything else is the core.
 
@@ -203,14 +209,13 @@ Details and manual steps: `docs/dev-stack.md`.
 
 ## Ollama model variants
 
-All layer the same `gemma4:12b` weights (built from `models/*.Modelfile`), so they add no real disk.
-None touch the weights, so each keeps the base model's safety training; they only change tone and format.
+Each is a system prompt and generation settings over a base model (`models/*.Modelfile`); none change the weights.
 
 | Model | For | Built from |
 |---|---|---|
-| `gemma4:12b` | the plain base model | — |
-| `gemma4-direct` | talking to the model yourself — direct, no moralizing or boilerplate caveats on legitimate work | `models/direct.Modelfile` |
-| `gemma4-offload` | the `local-llm` tool — returns only the requested artifact, invents nothing, says `NONE` when empty, low temperature for faithful extraction | `models/offload.Modelfile` |
+| `cloud-offload` | the `local-llm` tool's cloud tier (`gemma4:31b-cloud` on Ollama's free plan, no local RAM) — returns only the requested artifact, invents nothing, says `NONE` when empty, low temperature | `models/cloud-offload.Modelfile` |
+| `qwen-offload` | the `local-llm` tool's local tier, same prompt, over an abliterated Qwen3.5 9B (its refusals were removed by its maker, so sensitive documents get processed instead of refused) | `models/qwen-offload.Modelfile` |
+| `gemma4-direct` (optional) | talking to the model yourself — direct, no boilerplate caveats on legitimate work | `models/direct.Modelfile` |
 
 Rebuild one after editing its Modelfile: `ollama create <name> -f models/<name>.Modelfile`.
 
@@ -220,8 +225,11 @@ Rebuild one after editing its Modelfile: `ollama create <name> -f models/<name>.
 servers/<tool>/      one folder per MCP server (server.py, plus optional CLI scripts)
 skills/<skill>/      Claude Code skills (SKILL.md) that say when and how to use the tools
 config/global-CLAUDE.md  starter global Claude Code instructions (install.py links ~/.claude/CLAUDE.md here only if you have none)
-models/*.Modelfile   Ollama model variants (system prompt + generation settings over gemma4:12b)
-scripts/check.py     starts every server and lists its tools (never loads the model), checks skill headers
+models/*.Modelfile   Ollama model variants (system prompt + generation settings over a base model)
+localtools/          every tool as a Python function for chained scripts (`localtools` command); saved scripts in recipes/
+scripts/mcp_hub.py   shared servers: one copy of each, run by launchd, that every Claude Code session connects to
+scripts/setup_keys.py  `setup-keys`: optional free-model API keys for local-llm, stored in the macOS Keychain
+scripts/check.py     starts every server and lists its tools (never loads the model), checks the shared servers and skill headers
 scripts/hooks/       Claude Code hook (.claude/settings.json): blocks a commit if check.py fails
 install.py           connects everything to Claude Code, Claude Desktop, ~/.claude/skills and ~/.local/bin (command launchers)
 requirements.txt     packages in the shared .venv
@@ -239,7 +247,8 @@ config/optional/     built-but-off extras: lint/health hooks and headless-tools 
 python3 install.py
 .venv/bin/python scripts/check.py
 ```
-Then restart Claude Desktop. Claude Code picks up changes in new sessions.
+Then restart Claude Desktop. Claude Code picks up changes in new sessions (install.py also restarts the
+shared servers so they run the new code; or `launchctl kickstart -k gui/$(id -u)/com.claude-local-tools.mcp-hub`).
 
 Rebuilding the venv from scratch:
 ```bash
@@ -247,7 +256,9 @@ uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python -r requi
 ```
 
 ## Outside this folder
-- **Ollama app** (Homebrew cask `ollama-app`) with the `gemma4:12b` model and the variants above.
+- **Ollama app** (Homebrew cask `ollama-app`) with the models above.
+- **Shared servers**: launchd agent `~/Library/LaunchAgents/com.claude-local-tools.mcp-hub.plist` (remove with `mcp-hub uninstall`).
+- **API keys** (optional, from `setup-keys`) in the macOS Keychain: `freellmapi`, `deepseek-api`.
 - **Whisper models** in `~/.cache/huggingface/hub` (`whisper-large-v3-turbo`, `whisper-base-mlx`), plus
   Homebrew `ffmpeg` for decoding audio.
 - **Embedding model** `nomic-embed-text` in Ollama (~300 MB), for the `search` server.

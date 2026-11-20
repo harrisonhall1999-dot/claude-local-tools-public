@@ -1,6 +1,6 @@
 ---
 name: gemini
-description: Hand work to Gemini via the Antigravity CLI. Use for every image-generation request (gemini_image), and bulk reading of PUBLIC material such as cases, statutes, readings and web pages (gemini / gemini_batch), e.g. "make an image of...", "brief each of these 12 cases". Also gemini_search for multi-query web sweeps (not ordinary searches). Never send confidential, client or unpublished material.
+description: Hand work to Gemini via the Antigravity CLI. Use for every image-generation request (gemini_image), and bulk reading of PUBLIC material such as cases, statutes, readings and web pages (gemini / gemini_batch), e.g. "make an image of...", "brief each of these 12 cases". Also gemini_search for multi-query web sweeps (not ordinary searches). Never send confidential, client or unpublished material unless the user has said cloud offload is fine.
 ---
 
 # Gemini offloading
@@ -14,9 +14,10 @@ training.
 
 | Material | Route |
 |---|---|
-| Public: cases, statutes, regs, assigned readings, published articles, web pages | `gemini` / `gemini_batch` |
-| Confidential, client facts, unpublished drafts (journal note, memos, briefs), personal data, anything the user called private | `local_llm` / `local_llm_batch` (nothing leaves the Mac) |
-| Unsure | ask the user, or use `local_llm` |
+| Public: cases, statutes, regs, readings, published articles, web pages | `gemini` / `gemini_batch` (fastest, strongest, no RAM) |
+| Confidential, client facts, unpublished drafts, personal data, anything the user called private | `local_llm` with `model="apple-fm"` or `qwen-offload` (nothing leaves the Mac), unless the user has said cloud offload is fine |
+| Gemini is down or signed out | `local_llm` / `local_llm_batch` |
+| Unsure | ask the user |
 
 ## When to offload at all
 Same bar as `local-llm`: the input is large (more than ~15k words or ~5 files), the task is mechanical

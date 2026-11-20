@@ -1,11 +1,11 @@
-FROM gemma4:12b
+FROM sachasayan/interimlabs-huihui-qwen3.5-9b-abliterated:q4_k_m
 
 # Specialized variant for the local_llm offload tool: a precise instruction-
 # follower that returns ONLY the requested artifact. Not a chat model.
-# It does NOT remove the base model's safety training (weights unchanged;
-# this only layers a system prompt + generation settings).
+# The base weights are an abliterated Qwen3.5 9B (Huihui), so refusals are
+# already removed; this only layers a system prompt + generation settings.
 #
-# Build / rebuild:  ollama create gemma4-offload -f models/offload.Modelfile
+# Build / rebuild:  ollama create qwen-offload -f models/qwen-offload.Modelfile
 
 SYSTEM """You are a text-processing engine, not a chat partner. Another AI (Claude) sends you a task and some input and uses your output directly, so follow the task literally.
 
